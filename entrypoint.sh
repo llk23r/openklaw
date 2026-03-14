@@ -67,7 +67,7 @@ echo ""
 if [ -f "$CONFIG_FILE" ]; then echo "Restart detected — regenerating config, preserving state."
 else echo "First boot — generating config."; fi
 
-node /app/templates/config.js > "$CONFIG_FILE"
+node /app/templates/config.cjs > "$CONFIG_FILE"
 chown node:node "$CONFIG_FILE"
 echo "  Config written to $CONFIG_FILE"
 echo ""
