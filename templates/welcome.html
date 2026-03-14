@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>OpenKlaw</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:system-ui,sans-serif;background:#1a1a2e;color:#e0e0e0;display:flex;justify-content:center;align-items:center;min-height:100vh;padding:1rem}
+.card{background:#16213e;border-radius:12px;padding:2rem;max-width:480px;width:100%;text-align:center}
+h1{color:#e74c3c;font-size:1.6rem;margin-bottom:.3rem}
+.sub{color:#888;margin-bottom:1.5rem}
+.btn{display:block;padding:.8rem 1.2rem;border-radius:8px;text-decoration:none;font-weight:600;margin:.5rem 0;font-size:.95rem}
+.dash{background:#e74c3c;color:#fff}
+.dash:hover{background:#c0392b}
+.tg{background:#0088cc;color:#fff}
+.tg:hover{background:#006da3}
+.status{margin-top:1.5rem;text-align:left;font-size:.85rem;border-top:1px solid #2a2a4a;padding-top:1rem}
+.status div{display:flex;justify-content:space-between;padding:.3rem 0}
+.status .val{color:#2ecc71}
+</style>
+</head>
+<body>
+<div class="card">
+<h1>OpenKlaw</h1>
+<p class="sub">Your AI agent is running</p>
+<a href="/" class="btn dash">Open Dashboard</a>
+{{TELEGRAM_BUTTON}}
+<div class="status">
+<div><span>Model</span><span class="val">Kimi K2.5 (NVIDIA NIM)</span></div>
+<div><span>Telegram</span><span class="val">{{TELEGRAM_STATUS}}</span></div>
+<div><span>Security</span><span class="val">Token auth + hardened</span></div>
+</div>
+</div>
+</body>
+</html>
