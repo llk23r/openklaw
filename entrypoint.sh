@@ -3,16 +3,18 @@ set -euo pipefail
 
 # ============================================================
 # OpenKlaw — Railway Entrypoint
-# Validates env vars, generates config from templates, starts gateway.
+# Validates env vars, optionally starts Tailscale,
+# generates config from templates, starts gateway.
 # ============================================================
 
 CONFIG_DIR="${OPENCLAW_STATE_DIR:-/data/.openclaw}"
 CONFIG_FILE="$CONFIG_DIR/openclaw.json"
 CANVAS_DIR="$CONFIG_DIR/canvas"
 PORT="${PORT:-8080}"
+TAILSCALE_ENABLED="${TS_AUTHKEY:+true}"
 
 # --- Step 1: Init volume dirs + fix permissions ---
-mkdir -p "$CONFIG_DIR" /data/workspace "$CANVAS_DIR"
+mkdir -p "$CONFIG_DIR" /data/workspace "$CANVAS_DIR" /data/tailscale
 chown -R node:node /data
 
 # --- Step 2: Validate env vars ---
@@ -34,6 +36,7 @@ check_optional() {
 
 check_required MOONSHOT_API_KEY
 check_required GATEWAY_TOKEN
+check_optional TS_AUTHKEY "not set — public mode (no Tailscale)"
 check_optional TELEGRAM_BOT_TOKEN "not set — Telegram disabled"
 check_optional TELEGRAM_USER_ID "not set — using pairing mode"
 check_optional SYSTEM_PROMPT "using default"
@@ -63,7 +66,46 @@ case "$HTTP_CODE" in
 esac
 echo ""
 
-# --- Step 4: Generate openclaw.json from template ---
+# --- Step 4: Start Tailscale (if configured) ---
+TS_URL=""
+if [ -n "$TAILSCALE_ENABLED" ]; then
+  echo "Starting Tailscale (userspace networking)..."
+  tailscaled \
+    --state=/data/tailscale/tailscaled.state \
+    --socket=/var/run/tailscale/tailscaled.sock \
+    --tun=userspace-networking \
+    --no-logs-no-support &
+
+  # Wait for socket
+  for i in $(seq 1 20); do
+    [ -S /var/run/tailscale/tailscaled.sock ] && break
+    sleep 0.5
+  done
+
+  if [ ! -S /var/run/tailscale/tailscaled.sock ]; then
+    echo "  [!!] tailscaled failed to start"
+    exit 1
+  fi
+
+  # Authenticate
+  tailscale up \
+    --authkey="$TS_AUTHKEY" \
+    --hostname="${TS_HOSTNAME:-openklaw}" \
+    --accept-routes=false
+
+  # Get Tailscale URL
+  TS_URL=$(tailscale status --json 2>/dev/null \
+    | node -e "try{const d=JSON.parse(require('fs').readFileSync('/dev/stdin','utf8'));console.log('https://'+d.Self.DNSName.replace(/\.$/,''))}catch{}" 2>/dev/null || echo "")
+
+  if [ -n "$TS_URL" ]; then
+    echo "  [ok] Tailscale connected: $TS_URL"
+  else
+    echo "  [warn] Tailscale connected but could not determine URL"
+  fi
+  echo ""
+fi
+
+# --- Step 5: Generate openclaw.json from template ---
 if [ -f "$CONFIG_FILE" ]; then echo "Restart detected — regenerating config, preserving state."
 else echo "First boot — generating config."; fi
 
@@ -72,7 +114,7 @@ chown node:node "$CONFIG_FILE"
 echo "  Config written to $CONFIG_FILE"
 echo ""
 
-# --- Step 5: Generate welcome page from template ---
+# --- Step 6: Generate welcome page from template ---
 BOT_LINK=""
 BOT_HTML=""
 TG_STATUS="Not configured"
@@ -93,20 +135,33 @@ sed -e "s|{{TELEGRAM_BUTTON}}|$BOT_HTML|g" \
     /app/templates/welcome.html > "$CANVAS_DIR/index.html"
 chown node:node "$CANVAS_DIR/index.html"
 
-# --- Step 6: Print startup banner ---
+# --- Step 7: Print startup banner ---
 DOMAIN="${RAILWAY_PUBLIC_DOMAIN:-}"
+ACCESS_MODE="public (token-auth)"
+DASHBOARD_URL=""
+
+if [ -n "$TAILSCALE_ENABLED" ] && [ -n "$TS_URL" ]; then
+  DASHBOARD_URL="$TS_URL"
+  ACCESS_MODE="tailscale-only (zero public exposure)"
+elif [ -n "$DOMAIN" ]; then
+  DASHBOARD_URL="https://$DOMAIN"
+else
+  DASHBOARD_URL="http://localhost:$PORT"
+fi
+
 echo "=========================================="
 echo ""
-if [ -n "$DOMAIN" ]; then echo "  OpenKlaw is live!"; echo ""; echo "  Dashboard : https://$DOMAIN"
-else echo "  OpenKlaw is starting!"; echo ""; echo "  Dashboard : http://localhost:$PORT"; fi
+echo "  OpenKlaw is live!"
+echo ""
+echo "  Dashboard : $DASHBOARD_URL"
 if [ -n "$BOT_LINK" ]; then echo "  Telegram  : $BOT_LINK"; fi
 echo ""
 echo "  Model     : Kimi K2.5 (NVIDIA NIM)"
-echo "  Security  : token-auth, tools-restricted"
+echo "  Access    : $ACCESS_MODE"
 echo ""
 echo "=========================================="
 echo ""
 
-# --- Step 7: Start gateway (as node user) ---
+# --- Step 8: Start gateway (as node user) ---
 export PORT
 exec su -s /bin/bash node -c 'exec openclaw gateway --port "$PORT"'

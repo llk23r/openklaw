@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Reads openclaw.json base config and injects environment-specific values.
-// Usage: node config.js > /data/.openclaw/openclaw.json
+// Usage: node config.cjs > /data/.openclaw/openclaw.json
 
 const fs = require("fs");
 const path = require("path");
@@ -10,14 +10,32 @@ const base = JSON.parse(
   fs.readFileSync(path.join(__dirname, "openclaw.json"), "utf8")
 );
 
+const tailscaleEnabled = !!env.TS_AUTHKEY;
+
 // --- Auth ---
 base.gateway.auth.token = env.GATEWAY_TOKEN;
 
-// --- Allowed origins (platform-specific) ---
-if (env.RAILWAY_PUBLIC_DOMAIN) {
-  base.gateway.controlUi.allowedOrigins = [
-    `https://${env.RAILWAY_PUBLIC_DOMAIN}`,
-  ];
+// --- Tailscale mode ---
+if (tailscaleEnabled) {
+  base.gateway.bind = "loopback";
+  base.gateway.tailscale = {
+    mode: "serve",
+    resetOnExit: false,
+  };
+  base.gateway.auth.allowTailscale = true;
+  delete base.gateway.trustedProxies;
+
+  // Relax tool restrictions (network is trusted)
+  delete base.tools.profile;
+  delete base.tools.deny;
+  base.tools.exec = { ask: "always" };
+} else {
+  // Public mode: allowed origins
+  if (env.RAILWAY_PUBLIC_DOMAIN) {
+    base.gateway.controlUi.allowedOrigins = [
+      `https://${env.RAILWAY_PUBLIC_DOMAIN}`,
+    ];
+  }
 }
 
 // --- System prompt ---
