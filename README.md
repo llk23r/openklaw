@@ -2,7 +2,7 @@
 
 Security-hardened [OpenClaw](https://openclaw.ai) on Railway with NVIDIA NIM (Kimi K2.5) and Telegram.
 
-[![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/template/openklaw?referralCode=openklaw)
+[![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/new/template?template=https://github.com/llk23r/openklaw)
 
 ## Deploy
 
