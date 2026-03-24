@@ -18,15 +18,10 @@ base.gateway.auth.token = env.GATEWAY_TOKEN;
 // --- Tailscale mode ---
 if (tailscaleEnabled) {
   base.gateway.bind = "loopback";
-  base.gateway.tailscale = {
-    mode: "serve",
-    resetOnExit: false,
-  };
   base.gateway.auth.allowTailscale = true;
   delete base.gateway.trustedProxies;
 
   // Relax tool restrictions (network is trusted)
-  delete base.tools.profile;
   delete base.tools.deny;
   base.tools.exec = { ask: "always" };
 } else {

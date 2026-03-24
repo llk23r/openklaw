@@ -14,17 +14,15 @@
     "dmScope": "per-channel-peer"
   },
   "tools": {
-    "profile": "messaging",
     "deny": [
       "group:automation",
-      "group:runtime",
       "sessions_spawn",
       "sessions_send",
-      "gateway",
-      "cron"
+      "bash",
+      "process"
     ],
     "fs": { "workspaceOnly": true },
-    "exec": { "security": "deny", "ask": "always" },
+    "exec": { "ask": "always" },
     "elevated": { "enabled": false }
   },
   "discovery": {

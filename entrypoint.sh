@@ -40,6 +40,7 @@ check_optional TS_AUTHKEY "not set — public mode (no Tailscale)"
 check_optional TELEGRAM_BOT_TOKEN "not set — Telegram disabled"
 check_optional TELEGRAM_USER_ID "not set — using pairing mode"
 check_optional SYSTEM_PROMPT "using default"
+check_optional NODE_MAX_HEAP "default: 384 MB"
 echo ""
 
 if [ "$ERRORS" -gt 0 ]; then
@@ -70,11 +71,17 @@ echo ""
 TS_URL=""
 if [ -n "$TAILSCALE_ENABLED" ]; then
   echo "Starting Tailscale (userspace networking)..."
+
+  # Copy serve config to volume (must be a directory mount for Tailscale to detect changes)
+  mkdir -p /data/tailscale/config
+  cp /app/templates/ts-serve.json /data/tailscale/config/serve.json
+
+  # Start tailscaled with serve config
+  TS_SERVE_CONFIG=/data/tailscale/config/serve.json \
   tailscaled \
     --state=/data/tailscale/tailscaled.state \
     --socket=/var/run/tailscale/tailscaled.sock \
-    --tun=userspace-networking \
-    --no-logs-no-support &
+    --tun=userspace-networking &
 
   # Wait for socket
   for i in $(seq 1 20); do
@@ -87,7 +94,7 @@ if [ -n "$TAILSCALE_ENABLED" ]; then
     exit 1
   fi
 
-  # Authenticate
+  # Authenticate and bring up the network
   tailscale up \
     --authkey="$TS_AUTHKEY" \
     --hostname="${TS_HOSTNAME:-openklaw}" \
@@ -164,4 +171,5 @@ echo ""
 
 # --- Step 8: Start gateway (as node user) ---
 export PORT
+export NODE_OPTIONS="--max-old-space-size=${NODE_MAX_HEAP:-384} ${NODE_OPTIONS:-}"
 exec su -s /bin/bash node -c 'exec openclaw gateway --port "$PORT"'
